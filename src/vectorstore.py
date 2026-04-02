@@ -98,6 +98,37 @@ def search(query: str, n_results: int = 10) -> List[dict]:
 
     return formatted
 
+def search_by_source(source: str, n_results: int = 20) -> List[dict]:
+    """
+    Retrieve all chunks from a specific source document.
+    
+    Useful when a question is about a specific document
+    rather than a topic across documents.
+    
+    Args:
+        source: Filename to filter by.
+        n_results: Maximum results to return.
+        
+    Returns:
+        List of dicts with 'content', 'metadata', and 'distance' keys.
+    """
+    client = get_chroma_client()
+    collection = get_or_create_collection(client)
+
+    results = collection.get(
+        where={"source": source},
+        limit=n_results,
+    )
+
+    formatted = []
+    for i in range(len(results["ids"])):
+        formatted.append({
+            "content": results["documents"][i],
+            "metadata": results["metadatas"][i],
+            "distance": 0.0,
+        })
+
+    return formatted
 
 def reset_collection() -> None:
     """Delete and recreate the collection. Useful for re-ingesting."""
