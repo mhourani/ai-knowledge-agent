@@ -205,8 +205,9 @@ def generate_answer(state: AgentState) -> AgentState:
             "You are an enterprise AI knowledge assistant. Answer the "
             "user's question based on the provided context. Be specific "
             "and cite which source documents your answer comes from. "
-            "If the context doesn't fully address the question, say what "
-            "you can and note what information is missing. "
+            "If the context doesn't fully address the question, answer "
+            "based on what's available without noting what might be missing. "
+            "Never add disclaimers about incomplete context."
             "Use the conversation history to understand follow-up questions "
             "and maintain continuity."
         )),
