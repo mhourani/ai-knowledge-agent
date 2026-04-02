@@ -22,9 +22,83 @@ LOADER_MAP = {
 }
 
 
+def load_docx(filepath: str) -> List[Document]:
+    """Load a Word document (.docx) and return as Documents."""
+    from docx import Document as DocxDocument
+
+    doc = DocxDocument(filepath)
+    text = "\n\n".join(
+        paragraph.text for paragraph in doc.paragraphs if paragraph.text.strip()
+    )
+
+    return [Document(page_content=text, metadata={"source": os.path.basename(filepath), "type": "docx"})]
+
+
+def load_pptx(filepath: str) -> List[Document]:
+    """Load a PowerPoint presentation (.pptx) and return as Documents."""
+    from pptx import Presentation
+
+    prs = Presentation(filepath)
+    slides = []
+
+    for i, slide in enumerate(prs.slides, 1):
+        texts = []
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                for paragraph in shape.text_frame.paragraphs:
+                    text = paragraph.text.strip()
+                    if text:
+                        texts.append(text)
+
+        if texts:
+            content = f"[Slide {i}]\n" + "\n".join(texts)
+            slides.append(Document(
+                page_content=content,
+                metadata={"source": os.path.basename(filepath), "type": "pptx", "slide": i},
+            ))
+
+    return slides
+
+
+def load_xlsx(filepath: str) -> List[Document]:
+    """Load an Excel spreadsheet (.xlsx) and return as Documents."""
+    from openpyxl import load_workbook
+
+    wb = load_workbook(filepath, read_only=True, data_only=True)
+    sheets = []
+
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+        rows = []
+        for row in ws.iter_rows(values_only=True):
+            row_text = " | ".join(str(cell) if cell is not None else "" for cell in row)
+            if row_text.strip(" |"):
+                rows.append(row_text)
+
+        if rows:
+            content = f"[Sheet: {sheet_name}]\n" + "\n".join(rows)
+            sheets.append(Document(
+                page_content=content,
+                metadata={"source": os.path.basename(filepath), "type": "xlsx", "sheet": sheet_name},
+            ))
+
+    wb.close()
+    return sheets
+
+
+# Custom loaders for Office formats
+CUSTOM_LOADERS = {
+    ".docx": load_docx,
+    ".pptx": load_pptx,
+    ".xlsx": load_xlsx,
+}
+
+
 def load_documents(docs_dir: str = DOCS_DIR) -> List[Document]:
     """
     Load all supported documents from the specified directory.
+    
+    Supports: .txt, .pdf, .md, .docx, .pptx, .xlsx
     
     Args:
         docs_dir: Path to the directory containing documents.
@@ -33,6 +107,7 @@ def load_documents(docs_dir: str = DOCS_DIR) -> List[Document]:
         List of Document objects with content and metadata.
     """
     documents = []
+    all_supported = SUPPORTED_EXTENSIONS + list(CUSTOM_LOADERS.keys())
 
     if not os.path.exists(docs_dir):
         print(f"Documents directory '{docs_dir}' not found. Creating it.")
@@ -41,22 +116,27 @@ def load_documents(docs_dir: str = DOCS_DIR) -> List[Document]:
 
     for filename in os.listdir(docs_dir):
         ext = os.path.splitext(filename)[1].lower()
-        if ext not in SUPPORTED_EXTENSIONS:
+        if ext not in all_supported:
             print(f"Skipping unsupported file: {filename}")
             continue
 
         filepath = os.path.join(docs_dir, filename)
-        loader_class = LOADER_MAP.get(ext)
-
-        if loader_class is None:
-            continue
 
         try:
-            loader = loader_class(filepath)
-            loaded = loader.load()
-            # Add the source filename to metadata
+            # Check custom loaders first (Office formats)
+            if ext in CUSTOM_LOADERS:
+                loaded = CUSTOM_LOADERS[ext](filepath)
+            else:
+                loader_class = LOADER_MAP.get(ext)
+                if loader_class is None:
+                    continue
+                loader = loader_class(filepath)
+                loaded = loader.load()
+
+            # Ensure source metadata is set
             for doc in loaded:
                 doc.metadata["source"] = filename
+
             documents.extend(loaded)
             print(f"Loaded: {filename} ({len(loaded)} pages/sections)")
         except Exception as e:

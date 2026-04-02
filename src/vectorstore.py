@@ -64,7 +64,7 @@ def ingest_documents(chunks: List[Document]) -> int:
     return len(chunks)
 
 
-def search(query: str, n_results: int = 3) -> List[dict]:
+def search(query: str, n_results: int = 10) -> List[dict]:
     """
     Search the knowledge base for chunks relevant to the query.
     

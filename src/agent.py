@@ -96,7 +96,7 @@ def search_knowledge_base(state: AgentState) -> AgentState:
     """
     results = search(
         query=state["search_query"],
-        n_results=3,
+        n_results=10,
     )
 
     return {
