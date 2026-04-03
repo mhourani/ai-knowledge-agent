@@ -14,6 +14,10 @@ Unlike simple RAG implementations that blindly retrieve and respond, this agent 
 
 The agent maintains **conversation memory**, enabling natural multi-turn interactions with follow-up questions.
 
+## Screenshot
+
+![AI Knowledge Agent UI](images/ui-screenshot.png)
+
 ## Architecture
 ```
 User Question
