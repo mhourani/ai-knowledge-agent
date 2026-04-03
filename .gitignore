@@ -9,3 +9,4 @@ build/
 .pytest_cache/
 docs/*.xlsx
 docs/*.pdf
+.ms_token_cache.json

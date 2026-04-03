@@ -19,3 +19,8 @@ CHUNK_OVERLAP = 200
 # Document Settings
 DOCS_DIR = "docs"
 SUPPORTED_EXTENSIONS = [".txt", ".pdf", ".md"]
+
+# Microsoft Graph / OneDrive Settings
+MICROSOFT_CLIENT_ID = os.getenv("MICROSOFT_CLIENT_ID")
+MICROSOFT_SCOPES = ["Files.Read", "Files.Read.All", "User.Read"]
+ONEDRIVE_FOLDER = "/Documents"  # Default folder to sync from
