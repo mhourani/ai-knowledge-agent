@@ -7,6 +7,5 @@ __pycache__/
 dist/
 build/
 .pytest_cache/
-docs/*.xlsx
-docs/*.pdf
+docs/
 .ms_token_cache.json
