@@ -21,8 +21,16 @@ enterprise agentic RAG system. It is **not production-ready as-is** — see
 [PRODUCTION.md](PRODUCTION.md) for an honest inventory of what would need
 to be added to deploy this at scale.
 
-The prototype includes a basic evaluation framework in `evals/` — see
-[evals/README.md](evals/README.md) for details on running and extending it.
+The project includes:
+
+- **Containerized deployment** via Docker and docker-compose, mirroring a
+  production service architecture with ChromaDB as a separate service
+- **Evaluation framework** in `evals/` with regression tests covering
+  retrieval quality, hallucination resistance, security, and latency — see
+  [evals/README.md](evals/README.md)
+- **Honest gap analysis** documenting the distance between prototype and
+  production across observability, cost management, security, multi-tenancy,
+  and infrastructure as code — see [PRODUCTION.md](PRODUCTION.md)
 
 ## Screenshot
 
@@ -64,6 +72,69 @@ User Question
 - **LangChain** — Foundation framework for LLM application building
 
 ## Quick Start
+## Running with Docker (Recommended for Production-Like Testing)
+
+The project ships with a Dockerfile and docker-compose stack that runs the
+full application the way it would be deployed in production — with ChromaDB
+as a separate service communicating over HTTP. This mirrors the enterprise
+deployment pattern and eliminates "works on my machine" surprises.
+
+### Prerequisites
+
+- Docker Engine (or Docker Desktop)
+- Docker Compose v2 (ships with modern Docker)
+
+### Quick Start
+
+```bash
+# Clone the repo and create your .env file with API keys
+cp .env.example .env
+# Edit .env and add your ANTHROPIC_API_KEY (and optional OPENAI_API_KEY, MICROSOFT_CLIENT_ID)
+
+# Build and start the full stack
+docker compose up -d
+
+# Open the app
+open http://localhost:8501
+
+# View logs
+docker compose logs -f
+
+# Stop the stack
+docker compose down
+```
+
+### Architecture
+
+The stack runs two containers connected by an internal Docker network:
+
+- **agent** — the Streamlit application with the LangGraph agent
+- **chroma** — ChromaDB vector store running in HTTP server mode
+
+The agent detects its deployment mode automatically via the `CHROMA_HOST`
+environment variable. Without it, the agent uses local persistent storage
+(development mode). With it set, the agent connects to the ChromaDB service
+over HTTP (containerized/Kubernetes mode). Same code, different deployment
+shapes — this is the 12-factor configuration pattern.
+
+### Dockerfile Design Notes
+
+The Dockerfile uses a multi-stage build to keep the final image lean:
+
+- **Builder stage** installs build tools and compiles Python dependencies
+  into a virtual environment
+- **Runtime stage** copies only the virtual environment and application
+  code, runs as a non-root user, and includes a health check
+
+This separation removes ~500MB of build toolchain from the final image
+and follows container security best practices.
+
+### Production Deployment
+
+This docker-compose setup is a local development and testing target. For
+production deployment at scale, see [PRODUCTION.md](PRODUCTION.md) for the
+full production readiness inventory covering observability, cost management,
+security, multi-tenancy, and infrastructure as code.
 
 ### Prerequisites
 
