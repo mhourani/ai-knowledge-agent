@@ -9,3 +9,4 @@ build/
 .pytest_cache/
 docs/
 .ms_token_cache.json
+generated_images/

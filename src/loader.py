@@ -12,7 +12,7 @@ from langchain_community.document_loaders import (
 )
 
 from src.config import DOCS_DIR, CHUNK_SIZE, CHUNK_OVERLAP, SUPPORTED_EXTENSIONS
-
+from src.multimodal import IMAGE_EXTENSIONS
 
 # Map file extensions to their loader class
 LOADER_MAP = {
@@ -107,7 +107,7 @@ def load_documents(docs_dir: str = DOCS_DIR) -> List[Document]:
         List of Document objects with content and metadata.
     """
     documents = []
-    all_supported = SUPPORTED_EXTENSIONS + list(CUSTOM_LOADERS.keys())
+    all_supported = SUPPORTED_EXTENSIONS + list(CUSTOM_LOADERS.keys()) + IMAGE_EXTENSIONS
 
     if not os.path.exists(docs_dir):
         print(f"Documents directory '{docs_dir}' not found. Creating it.")
@@ -123,9 +123,15 @@ def load_documents(docs_dir: str = DOCS_DIR) -> List[Document]:
         filepath = os.path.join(docs_dir, filename)
 
         try:
-            # Check custom loaders first (Office formats)
             if ext in CUSTOM_LOADERS:
                 loaded = CUSTOM_LOADERS[ext](filepath)
+            elif ext in IMAGE_EXTENSIONS:
+                from src.multimodal import analyze_image
+                description = analyze_image(filepath)
+                loaded = [Document(
+                    page_content=f"[Image: {filename}]\n\n{description}",
+                    metadata={"source": filename, "type": "image", "format": ext.strip(".")},
+                )]
             else:
                 loader_class = LOADER_MAP.get(ext)
                 if loader_class is None:
@@ -133,7 +139,6 @@ def load_documents(docs_dir: str = DOCS_DIR) -> List[Document]:
                 loader = loader_class(filepath)
                 loaded = loader.load()
 
-            # Ensure source metadata is set
             for doc in loaded:
                 doc.metadata["source"] = filename
 

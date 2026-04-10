@@ -1,0 +1,48 @@
+# Git
+.git
+.gitignore
+.github
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info
+.pytest_cache
+.coverage
+venv/
+env/
+
+# Virtual environment
+.venv/
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Environment variables (never ship secrets in images)
+.env
+.env.local
+.env.*.local
+.ms_token_cache.json
+
+# Local data
+chroma_db/
+docs/
+generated_images/
+*.log
+
+# Tests
+.pytest_cache/
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Eval reports
+evals/reports/

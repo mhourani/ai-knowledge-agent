@@ -1,5 +1,5 @@
 """Vector store management using ChromaDB for the AI Knowledge Agent."""
-
+import os
 import chromadb
 from typing import List, Optional
 
@@ -8,27 +8,45 @@ from langchain_core.documents import Document
 from src.config import CHROMA_PERSIST_DIR, COLLECTION_NAME
 
 
-def get_chroma_client() -> chromadb.PersistentClient:
+def get_chroma_client():
     """
-    Create a persistent ChromaDB client.
+    Create a ChromaDB client that works in both local and containerized
+    environments.
     
-    Data is stored locally in the .chroma directory so it
-    survives between runs — you don't re-ingest every time.
-    """
-    return chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
-
-
-def get_or_create_collection(client: chromadb.PersistentClient) -> chromadb.Collection:
-    """
-    Get existing collection or create a new one.
+    - In local development: uses PersistentClient with a local directory,
+      so data survives between runs without needing a separate service.
+    - In containerized deployments (docker-compose, Kubernetes): uses
+      HttpClient to connect to a separate ChromaDB service over HTTP,
+      which is the standard production pattern.
     
-    Uses ChromaDB's built-in embedding function (all-MiniLM-L6-v2)
-    which runs locally — no API calls needed for embeddings.
+    The mode is controlled by the CHROMA_HOST environment variable:
+    - If set, connects to ChromaDB over HTTP at that host
+    - If not set, falls back to local persistent mode
     """
-    return client.get_or_create_collection(
-        name=COLLECTION_NAME,
-        metadata={"description": "Enterprise AI Knowledge Base"},
-    )
+    chroma_host = os.getenv("CHROMA_HOST")
+    
+    if chroma_host:
+        # Production / containerized mode — connect to ChromaDB service
+        chroma_port = int(os.getenv("CHROMA_PORT", "8000"))
+        print(f"Connecting to ChromaDB at {chroma_host}:{chroma_port}")
+        return chromadb.HttpClient(
+            host=chroma_host,
+            port=chroma_port,
+        )
+    else:
+        # Local development mode — persistent on-disk storage
+        return chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
+    
+def get_or_create_collection(client):
+    """
+    Get the existing collection or create a new one.
+    
+    We don't pass an embedding_function here because ChromaDB's
+    default embedder (all-MiniLM-L6-v2) is applied automatically
+    server-side when using HttpClient, and passing it explicitly
+    causes serialization mismatches between client/server versions.
+    """
+    return client.get_or_create_collection(name=COLLECTION_NAME)
 
 
 def ingest_documents(chunks: List[Document]) -> int:
@@ -130,8 +148,18 @@ def search_by_source(source: str, n_results: int = 20) -> List[dict]:
 
     return formatted
 
-def reset_collection() -> None:
-    """Delete and recreate the collection. Useful for re-ingesting."""
+def reset_collection():
+    """
+    Delete and recreate the collection.
+    
+    Safe to call even if the collection doesn't exist yet — this makes
+    it work reliably across fresh deployments (new containers, new
+    Kubernetes pods) and existing databases.
+    """
     client = get_chroma_client()
-    client.delete_collection(name=COLLECTION_NAME)
-    print(f"Collection '{COLLECTION_NAME}' has been reset.")
+    try:
+        client.delete_collection(name=COLLECTION_NAME)
+    except Exception:
+        # Collection doesn't exist yet — that's fine, nothing to delete
+        pass
+    get_or_create_collection(client)

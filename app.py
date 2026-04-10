@@ -117,8 +117,8 @@ with st.sidebar:
     uploaded_files = st.file_uploader(
         "Upload documents",
         accept_multiple_files=True,
-        type=["txt", "pdf", "md", "docx", "pptx", "xlsx"],
-        help="Supported: TXT, PDF, MD, DOCX, PPTX, XLSX",
+        type=["txt", "pdf", "md", "docx", "pptx", "xlsx", "png", "jpg", "jpeg", "gif", "webp"],
+        help="Supported: TXT, PDF, MD, DOCX, PPTX, XLSX, PNG, JPG, GIF, WEBP",
     )
 
     if uploaded_files:
@@ -129,25 +129,56 @@ with st.sidebar:
                 f.write(uploaded_file.getbuffer())
         st.success(f"Uploaded {len(uploaded_files)} file(s)")
 
-    # Ingest button
+    # ============ PERSISTENT SUCCESS MESSAGES ============
+    # These show messages that survive a rerun (flags set elsewhere get displayed here)
+    if st.session_state.get("just_reset"):
+        st.success("✅ Knowledge base reset successfully")
+        st.session_state.just_reset = False
+
+    if st.session_state.get("just_ingested"):
+        info = st.session_state.just_ingested
+        st.success(f"✅ Ingested {info['chunks']} chunks from {info['docs']} documents")
+        st.session_state.just_ingested = None
+
+    # ============ INGEST BUTTON ============
     if st.button("🔄 Ingest Documents", use_container_width=True):
         with st.spinner("Loading and indexing documents..."):
             docs = load_documents()
             if docs:
                 chunks = split_documents(docs)
                 ingest_documents(chunks)
-                st.success(f"Ingested {len(chunks)} chunks from {len(docs)} documents")
+                # Set flag to show persistent success on next render
+                st.session_state.just_ingested = {
+                    "chunks": len(chunks),
+                    "docs": len(docs),
+                }
                 st.rerun()
             else:
                 st.warning("No documents found in docs/ folder")
 
-    # Reset button
+    # ============ RESET BUTTON WITH CONFIRMATION ============
+    # First click sets confirm_reset flag
     if st.button("🗑️ Reset Knowledge Base", use_container_width=True):
-        reset_collection()
-        st.session_state.messages = []
-        st.session_state.conversation = ConversationManager()
-        st.success("Knowledge base reset")
+        st.session_state.confirm_reset = True
         st.rerun()
+
+    # Confirmation UI — renders when confirm_reset flag is set
+    # Must be OUTSIDE the button block so it persists across reruns
+    if st.session_state.get("confirm_reset"):
+        st.warning("⚠️ This will delete all ingested documents from the knowledge base. This cannot be undone.")
+        col_confirm, col_cancel = st.columns(2)
+        with col_confirm:
+            if st.button("✅ Yes, reset", use_container_width=True, type="primary", key="confirm_reset_yes"):
+                reset_collection()
+                st.session_state.messages = []
+                st.session_state.conversation = ConversationManager()
+                st.session_state.confirm_reset = False
+                st.session_state.just_reset = True
+                st.rerun()
+        with col_cancel:
+            if st.button("❌ Cancel", use_container_width=True, key="confirm_reset_no"):
+                st.session_state.confirm_reset = False
+                st.rerun()
 
     # Clear conversation
     if st.button("💬 Clear Conversation", use_container_width=True):

@@ -1,0 +1,68 @@
+# ============================================================================
+# AI Knowledge Agent - Local Development Stack
+#
+# Run the full application stack locally with one command:
+#   docker-compose up
+#
+# This mirrors the production architecture where ChromaDB runs as a
+# separate service. For local dev we use the same pattern so there are
+# no surprises when deploying to Kubernetes.
+# ============================================================================
+
+services:
+  # -------- AI Knowledge Agent (Streamlit app) --------
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ai-knowledge-agent:latest
+    container_name: ai-knowledge-agent
+    ports:
+      - "8501:8501"
+    environment:
+      # Secrets loaded from .env file (not committed to git)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID:-}
+      # Point ChromaDB client at the chroma service below
+      - CHROMA_HOST=chroma
+      - CHROMA_PORT=8000
+    volumes:
+      # Mount docs folder for local development — in production this
+      # would be replaced by object storage (S3, Azure Blob) or a
+      # connector pipeline
+      - ./docs:/app/docs:ro
+      - ./generated_images:/app/generated_images
+    depends_on:
+      - chroma
+    restart: unless-stopped
+    networks:
+      - agent-net
+
+  # -------- ChromaDB Vector Store --------
+  chroma:
+    image: chromadb/chroma:0.5.23
+    container_name: ai-knowledge-agent-chroma
+    ports:
+      # Only expose locally for debugging, not needed for app-to-app comms
+      - "8000:8000"
+    volumes:
+      # Persist vector data across container restarts
+      - chroma-data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    restart: unless-stopped
+    networks:
+      - agent-net
+
+# Named volume for ChromaDB persistence
+# Survives container restarts and rebuilds
+volumes:
+  chroma-data:
+    driver: local
+
+# Internal network for service-to-service communication
+networks:
+  agent-net:
+    driver: bridge
