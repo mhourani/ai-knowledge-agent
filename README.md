@@ -14,6 +14,16 @@ Unlike simple RAG implementations that blindly retrieve and respond, this agent 
 
 The agent maintains **conversation memory**, enabling natural multi-turn interactions with follow-up questions.
 
+## Production Thinking
+
+This project is a working prototype demonstrating the core patterns of an
+enterprise agentic RAG system. It is **not production-ready as-is** — see
+[PRODUCTION.md](PRODUCTION.md) for an honest inventory of what would need
+to be added to deploy this at scale.
+
+The prototype includes a basic evaluation framework in `evals/` — see
+[evals/README.md](evals/README.md) for details on running and extending it.
+
 ## Screenshot
 
 ![AI Knowledge Agent UI](images/ui-screenshot.png)
