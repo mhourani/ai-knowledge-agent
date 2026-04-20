@@ -1,0 +1,142 @@
+# ============================================================================
+# AI Knowledge Agent - Default Values
+#
+# Override these values for your environment:
+#   helm install my-agent ./chart -f my-values.yaml
+#
+# Or inline:
+#   helm install my-agent ./chart --set agent.image.tag=v1.2.3
+# ============================================================================
+
+# ---------- Agent (Streamlit + LangGraph application) ----------
+agent:
+  replicaCount: 1
+
+  image:
+    repository: ai-knowledge-agent
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  # Container port for Streamlit
+  port: 8501
+
+  # Resource requests and limits
+  # Start conservative — tune based on actual usage and load testing
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+  # Environment variables injected into the agent container
+  # API keys are loaded from the Kubernetes Secret (see secret section below)
+  env:
+    STREAMLIT_SERVER_PORT: "8501"
+    STREAMLIT_SERVER_ADDRESS: "0.0.0.0"
+    STREAMLIT_SERVER_HEADLESS: "true"
+    STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+    PYTHONUNBUFFERED: "1"
+
+  # Health check configuration
+  # Streamlit exposes /_stcore/health for liveness/readiness probes
+  healthCheck:
+    path: /_stcore/health
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+
+  # Horizontal Pod Autoscaler
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+# ---------- ChromaDB Vector Store ----------
+chroma:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: chromadb/chroma
+    tag: "0.5.23"
+    pullPolicy: IfNotPresent
+
+  port: 8000
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+
+  # Persistent storage for vector data
+  # Without persistence, ingested documents are lost on pod restart
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""  # Empty = use cluster default; set to "gp3" (EKS), "managed-premium" (AKS), etc.
+    accessMode: ReadWriteOnce
+
+  env:
+    IS_PERSISTENT: "TRUE"
+    ANONYMIZED_TELEMETRY: "FALSE"
+
+# ---------- Secrets ----------
+# API keys and sensitive credentials
+# In production, use External Secrets Operator or Sealed Secrets
+# instead of storing values directly in Helm
+secrets:
+  # Set these via --set or a separate values file that is NOT committed to git
+  anthropicApiKey: ""
+  openaiApiKey: ""
+  microsoftClientId: ""
+
+# ---------- Service ----------
+service:
+  type: ClusterIP  # Use LoadBalancer for direct access, or ClusterIP + Ingress
+  port: 80
+  targetPort: 8501
+
+# ---------- Ingress ----------
+ingress:
+  enabled: false
+  className: ""  # "alb" for AWS, "nginx" for nginx-ingress, etc.
+  annotations: {}
+    # For AWS ALB Ingress Controller:
+    # kubernetes.io/ingress.class: alb
+    # alb.ingress.kubernetes.io/scheme: internet-facing
+    # alb.ingress.kubernetes.io/target-type: ip
+    #
+    # For nginx:
+    # kubernetes.io/ingress.class: nginx
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: ai-agent.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+    # - secretName: ai-agent-tls
+    #   hosts:
+    #     - ai-agent.example.com
+
+# ---------- Global ----------
+nameOverride: ""
+fullnameOverride: ""
+
+# Image pull secrets for private registries (ECR, ACR, GCR)
+imagePullSecrets: []
+  # - name: ecr-registry-secret
+  # - name: acr-registry-secret
+
+# Node selector, tolerations, affinity for scheduling control
+nodeSelector: {}
+tolerations: []
+affinity: {}

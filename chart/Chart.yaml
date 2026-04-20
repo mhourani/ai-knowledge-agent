@@ -1,0 +1,34 @@
+# ============================================================================
+# AI Knowledge Agent - Helm Chart
+#
+# This chart deploys the enterprise agentic RAG system on Kubernetes.
+# It manages two services:
+#   1. The agent (Streamlit + LangGraph application)
+#   2. ChromaDB (vector store, deployed as a separate service)
+#
+# The chart is cloud-agnostic — it works on EKS, AKS, GKE, or any
+# conformant Kubernetes cluster.
+# ============================================================================
+
+apiVersion: v2
+name: ai-knowledge-agent
+description: Enterprise Agentic RAG System with LangGraph, ChromaDB, and Claude
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+
+keywords:
+  - ai
+  - rag
+  - agentic
+  - langraph
+  - chromadb
+  - enterprise
+
+home: https://github.com/mhourani/ai-knowledge-agent
+sources:
+  - https://github.com/mhourani/ai-knowledge-agent
+
+maintainers:
+  - name: Mark Hourani
+    email: mark@hourani.ai
