@@ -1,0 +1,32 @@
+# ============================================================================
+# ChromaDB PersistentVolumeClaim
+#
+# Stores vector embeddings and collection data on a persistent volume
+# so data survives pod restarts and redeployments.
+#
+# Storage class varies by cloud provider:
+#   AWS EKS:   gp3 (default), io1 (high IOPS)
+#   Azure AKS: managed-premium, managed-csi-premium
+#   GCP GKE:   standard, premium-rwo
+#
+# Leave storageClass empty to use the cluster default.
+# ============================================================================
+
+{{- if and .Values.chroma.enabled .Values.chroma.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "ai-knowledge-agent.chromaName" . }}
+  labels:
+    {{- include "ai-knowledge-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: chroma
+spec:
+  accessModes:
+    - {{ .Values.chroma.persistence.accessMode }}
+  {{- if .Values.chroma.persistence.storageClass }}
+  storageClassName: {{ .Values.chroma.persistence.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.chroma.persistence.size }}
+{{- end }}

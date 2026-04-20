@@ -1,0 +1,102 @@
+# ============================================================================
+# Agent Deployment
+#
+# Runs the Streamlit + LangGraph application. Connects to ChromaDB
+# via the CHROMA_HOST environment variable — same 12-factor pattern
+# used in docker-compose, just with Kubernetes Service DNS instead
+# of Docker network aliases.
+# ============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ai-knowledge-agent.fullname" . }}
+  labels:
+    {{- include "ai-knowledge-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+spec:
+  replicas: {{ .Values.agent.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "ai-knowledge-agent.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: agent
+  template:
+    metadata:
+      labels:
+        {{- include "ai-knowledge-agent.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: agent
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: agent
+          image: "{{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag }}"
+          imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.agent.port }}
+              protocol: TCP
+          env:
+            # ChromaDB connection — points to the chroma Service in the same namespace
+            - name: CHROMA_HOST
+              value: {{ include "ai-knowledge-agent.chromaName" . }}
+            - name: CHROMA_PORT
+              value: "{{ .Values.chroma.port }}"
+            # Static environment variables from values.yaml
+            {{- range $key, $value := .Values.agent.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            # Secrets loaded from Kubernetes Secret
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ai-knowledge-agent.fullname" . }}
+                  key: ANTHROPIC_API_KEY
+            {{- if .Values.secrets.openaiApiKey }}
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ai-knowledge-agent.fullname" . }}
+                  key: OPENAI_API_KEY
+            {{- end }}
+            {{- if .Values.secrets.microsoftClientId }}
+            - name: MICROSOFT_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ai-knowledge-agent.fullname" . }}
+                  key: MICROSOFT_CLIENT_ID
+            {{- end }}
+          # Liveness probe — is the container still running?
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.agent.healthCheck.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.agent.healthCheck.initialDelaySeconds }}
+            periodSeconds: {{ .Values.agent.healthCheck.periodSeconds }}
+            timeoutSeconds: {{ .Values.agent.healthCheck.timeoutSeconds }}
+            failureThreshold: {{ .Values.agent.healthCheck.failureThreshold }}
+          # Readiness probe — is the container ready to serve traffic?
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.agent.healthCheck.path }}
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.agent.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

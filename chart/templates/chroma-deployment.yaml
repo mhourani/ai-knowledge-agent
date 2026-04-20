@@ -1,0 +1,73 @@
+# ============================================================================
+# ChromaDB Deployment
+#
+# Runs the vector store as a separate service, mirroring the
+# docker-compose architecture. ChromaDB stores embeddings and
+# serves similarity search queries over HTTP.
+#
+# For production at scale, consider replacing this with a managed
+# vector store (Pinecone, Weaviate Cloud, Qdrant Cloud) or a
+# StatefulSet with proper backup and replication.
+# ============================================================================
+
+{{- if .Values.chroma.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ai-knowledge-agent.chromaName" . }}
+  labels:
+    {{- include "ai-knowledge-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: chroma
+spec:
+  replicas: {{ .Values.chroma.replicaCount }}
+  # ChromaDB should not be scaled horizontally without a distributed
+  # backend — it uses local file storage by default
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "ai-knowledge-agent.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: chroma
+  template:
+    metadata:
+      labels:
+        {{- include "ai-knowledge-agent.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: chroma
+    spec:
+      containers:
+        - name: chroma
+          image: "{{ .Values.chroma.image.repository }}:{{ .Values.chroma.image.tag }}"
+          imagePullPolicy: {{ .Values.chroma.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.chroma.port }}
+              protocol: TCP
+          env:
+            {{- range $key, $value := .Values.chroma.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          volumeMounts:
+            {{- if .Values.chroma.persistence.enabled }}
+            - name: chroma-data
+              mountPath: /chroma/chroma
+            {{- end }}
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.chroma.resources | nindent 12 }}
+      volumes:
+        {{- if .Values.chroma.persistence.enabled }}
+        - name: chroma-data
+          persistentVolumeClaim:
+            claimName: {{ include "ai-knowledge-agent.chromaName" . }}
+        {{- end }}
+{{- end }}

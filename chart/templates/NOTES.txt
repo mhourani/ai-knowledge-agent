@@ -1,0 +1,43 @@
+=====================================================================
+ AI Knowledge Agent has been deployed!
+=====================================================================
+
+Release:   {{ .Release.Name }}
+Namespace: {{ .Release.Namespace }}
+Version:   {{ .Chart.AppVersion }}
+
+{{- if .Values.ingress.enabled }}
+
+Access the application at:
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+
+{{- else if eq .Values.service.type "LoadBalancer" }}
+
+Get the application URL by running:
+  export SERVICE_IP=$(kubectl get svc {{ include "ai-knowledge-agent.fullname" . }} \
+    -n {{ .Release.Namespace }} \
+    -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+  echo http://$SERVICE_IP:{{ .Values.service.port }}
+
+{{- else }}
+
+Access the application via port-forward:
+  kubectl port-forward svc/{{ include "ai-knowledge-agent.fullname" . }} \
+    -n {{ .Release.Namespace }} 8501:{{ .Values.service.port }}
+
+  Then open: http://localhost:8501
+
+{{- end }}
+
+To check the status of the deployment:
+  kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
+
+To view logs:
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/component=agent -f
+
+To upgrade the release:
+  helm upgrade {{ .Release.Name }} ./chart -f your-values.yaml
+
+=====================================================================
