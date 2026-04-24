@@ -93,6 +93,7 @@ class EvalRunner:
             refusal_signals = [
                 "i don't know",
                 "i cannot",
+                "i can't",
                 "i'm not able",
                 "no information",
                 "not found",
