@@ -22,6 +22,8 @@ from langgraph.graph import StateGraph, END
 from src.config import ANTHROPIC_API_KEY, MODEL_NAME, MAX_TOKENS
 from src.vectorstore import search
 
+import logging
+
 
 # --- State Definition ---
 # This is the "memory" that flows through the graph.
@@ -297,16 +299,40 @@ class ConversationManager:
         """
         Ask the knowledge agent a question with conversation context.
         
+        Includes three layers of security:
+          1. Input detection — block prompt injection attempts
+          2. Input sanitization — strip dangerous delimiters
+          3. Output validation — prevent system prompt leakage
+        
         Args:
             question: Natural language question.
             
         Returns:
             The agent's answer based on the knowledge base and conversation history.
         """
+        from src.security import (
+            detect_injection,
+            sanitize_input,
+            get_safe_response,
+            REFUSAL_MESSAGE,
+        )
+
+        # Layer 1: Detect prompt injection attempts
+        is_injection, category = detect_injection(question)
+        if is_injection:
+            self.chat_history.append({
+                "question": question,
+                "answer": REFUSAL_MESSAGE,
+            })
+            return REFUSAL_MESSAGE
+
+        # Layer 2: Sanitize input (strip dangerous delimiters)
+        clean_question = sanitize_input(question)
+
         agent = build_agent()
 
         initial_state = {
-            "question": question,
+            "question": clean_question,
             "search_query": "",
             "search_results": [],
             "search_count": 0,
@@ -317,13 +343,16 @@ class ConversationManager:
 
         final_state = agent.invoke(initial_state)
 
+        # Layer 3: Validate output before returning
+        safe_answer = get_safe_response(final_state["answer"])
+
         # Store this turn in history
         self.chat_history.append({
             "question": question,
-            "answer": final_state["answer"],
+            "answer": safe_answer,
         })
 
-        return final_state["answer"]
+        return safe_answer
 
     def clear_history(self):
         """Clear conversation history to start fresh."""
